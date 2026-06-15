@@ -96,7 +96,51 @@ public final class BridgeExports {
     $wnd.aiExportAia = function (onDone) {
       @com.google.appinventor.client.BridgeExports::exportAia(Lcom/google/gwt/core/client/JavaScriptObject;)(onDone || null);
     };
+    $wnd.aiOpenProject = function (uploadInfo, onDone) {
+      @com.google.appinventor.client.BridgeExports::openProject(Ljava/lang/String;Lcom/google/gwt/core/client/JavaScriptObject;)(String(uploadInfo), onDone || null);
+    };
   }-*/;
+
+  /**
+   * Open a just-uploaded project IN-PLACE — no full page reload.
+   *
+   * The embed bridge creates a project by POSTing a .aia to
+   * /ode/upload/project via raw HTTP, which the already-running GWT app's
+   * ProjectManager knows nothing about. The bridge used to force
+   * window.location.reload() so GWT would re-fetch its project list and open
+   * the new project from the URL hash — a SECOND full GWT boot (several seconds
+   * on a cold permutation load), the dominant cost of embed startup.
+   *
+   * Instead we mirror ProjectUploadWizard.onSuccess exactly: parse the upload
+   * info into a UserProject, register it with the ProjectManager, and open it in
+   * the designer — all in the live instance, no reload.
+   *
+   * @param uploadInfo the UploadResponse info field
+   *     (projectId#DELIM#name#DELIM#type#DELIM#creationDate#DELIM#modDate#DELIM#buildDate),
+   *     i.e. everything after the status/date/size header the bridge already parses.
+   * Callback: invokeDone(null, projectIdString) once the open is initiated, or
+   * invokeDone(err, null) on failure so the bridge can fall back to a reload.
+   */
+  public static void openProject(String uploadInfo, final com.google.gwt.core.client.JavaScriptObject onDone) {
+    if (uploadInfo == null || uploadInfo.isEmpty()) {
+      invokeDone(onDone, "uploadInfo required", null);
+      return;
+    }
+    try {
+      com.google.appinventor.shared.rpc.project.UserProject userProject =
+          com.google.appinventor.shared.rpc.project.UserProject.valueOf(uploadInfo);
+      Ode ode = Ode.getInstance();
+      Project uploadedProject = ode.getProjectManager().addProject(userProject);
+      if (uploadedProject == null) {
+        invokeDone(onDone, "addProject returned null", null);
+        return;
+      }
+      ode.openYoungAndroidProjectInDesigner(uploadedProject);
+      invokeDone(onDone, null, String.valueOf(userProject.getProjectId()));
+    } catch (Exception e) {
+      invokeDone(onDone, "openProject: " + (e == null ? "unknown" : e.getMessage()), null);
+    }
+  }
 
   /**
    * Build a .aia (base64) from the live in-memory project state — no server
