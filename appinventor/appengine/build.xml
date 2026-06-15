@@ -35,9 +35,14 @@
     <equals arg1="${release}" arg2="true" />
   </condition>
 
+  <!-- -localWorkers parallelises the per-permutation GWT compile. It was only
+       set for release builds; the draft path (what the appengine Cloud Build
+       runs) had none, so it compiled permutations serially on an otherwise
+       32-vCPU machine. 8 workers + -Xmx6G is the proven release config, so use
+       it for both. -->
   <condition property="client.flags"
              value="-optimize 9 -localWorkers 8"
-             else="-style pretty">
+             else="-style pretty -localWorkers 8">
     <equals arg1="${release}" arg2="true" />
   </condition>
 
